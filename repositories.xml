@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<repositories version="1.0">
+  <repo priority="50" quality="experimental" status="unofficial">
+    <name>martopad</name>
+    <description>Martopad's personal Gentoo overlay</description>
+    <homepage>https://github.com/martopad/gentoo-overlay</homepage>
+    <owner>
+      <email>martopad1@gmail.com</email>
+      <name>Martin Luther Yung</name>
+    </owner>
+    <source type="git">https://github.com/martopad/gentoo-overlay.git</source>
+  </repo>
+</repositories>
+
