@@ -11,7 +11,7 @@ SRC_URI="https://kernel.org/pub/linux/utils/kernel/ipvsadm/ipvsadm-${PV}.tar.xz"
 
 LICENSE="GPL-2"
 SLOT="0"
-KEYWORDS="amd64 ~ia64 ~ppc ppc64 ~s390 sparc x86"
+KEYWORDS="arm64"
 IUSE="static-libs"
 
 RDEPEND="
@@ -27,13 +27,6 @@ BDEPEND="
 
 PATCHES=( "${FILESDIR}/${PN}"-1.27-buildsystem.patch )
 
-pkg_pretend() {
-	if kernel_is 2 4; then
-		eerror "${P} supports only 2.6 series and later kernels, please try ${PN}-1.21 for 2.4 kernels"
-		die "wrong kernel version"
-	fi
-}
-
 src_prepare() {
 	default
 	use static-libs && export STATIC=1
@@ -42,16 +35,15 @@ src_prepare() {
 src_compile() {
 	local libnl_include
 	if has_version ">=dev-libs/libnl-3.0"; then
-		libnl_include=$($(tc-getPKG_CONFIG) --cflags libnl-3.0)
+		libnl_include=$(pkg-config --cflags libnl-3.0)
 	else
 		libnl_include=""
 	fi
 	emake -e \
 		INCLUDE="-I.. -I. ${libnl_include}" \
-		CC="$(tc-getCC)" \
 		HAVE_NL=1 \
 		STATIC="${STATIC}" \
-		POPT_LIB="$($(tc-getPKG_CONFIG) --libs popt)"
+		POPT_LIB="$(pkg-config --libs popt)"
 }
 
 src_install() {
