@@ -72,8 +72,8 @@ KEYWORDS="~amd64"
 # generic-uki: the kernel-build eclass only builds the dracut initramfs
 # when this flag is on (off by default). A lab kernel that ships
 # without an initramfs never reaches GRUB on these boxes, so it is
-# on by default here.
-IUSE="generic-uki"
+# on by default here (+ prefix: bare flags default off).
+IUSE="+generic-uki"
 
 src_prepare() {
 	# Apply the pinned patch series with portage's native patcher.
