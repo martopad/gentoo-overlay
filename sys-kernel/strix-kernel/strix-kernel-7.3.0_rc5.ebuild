@@ -87,21 +87,18 @@ IUSE="debug"
 # the rest of the build (kernel-build eclass) is toolchain-only.
 BDEPEND="
 	dev-vcs/git
+	sys-kernel/dracut
 "
 
 src_prepare() {
-	# Apply the pinned patch series with portage's native patcher.
+	# Apply the driver's pinned patch series with their own tool
+	# (tools/apply-series.sh, see below). Ordering source of truth = the
+	# driver's patches/series file (the one their provenance manifest pins
+	# via series_sha256): series entries in listed order, then every
+	# patches/kernel-backports/*.patch in glob order.
 	#
-	# Ordering source of truth = the driver's patches/series (the file
-	# the lab's provenance manifest pins via series_sha256), exactly as
-	# their apply-series.sh consumes it: series entries in listed
-	# order, then every patches/kernel-backports/*.patch in glob
-	# (alphabetical) order. Their fail-fast checks (entry exists, not a
-	# symlink, no path-traversal entries) are reproduced below; the
-	# apply itself is `eapply` (patch -p1 based).
-	#
-	# A failed apply leaves the tree partially patched — harmless: the
-	# next emerge unpacks a fresh copy (their tool says the same thing).
+	# A failed apply leaves the tree partially patched — harmless: the next
+	# emerge unpacks a fresh copy (their tool says the same thing).
 	eapply_user
 
 	# The driver's own tool: applies their pinned series (patches/series in
@@ -193,6 +190,18 @@ pkg_postinst() {
 	# call the modules land in /lib/modules but no bootable image reaches
 	# /boot and the kernel never appears in GRUB.
 	kernel-install_pkg_postinst
+
+	# Ensure an initramfs exists for this release. The eclass install path
+	# generates one only when installkernel carries the dracut USE flag; on
+	# the m5 boxes installkernel is installed without it, so generate the
+	# initramfs directly with dracut when it is missing. LVM/DM/XFS are
+	# built into this kernel, so a missing initramfs would still boot, but
+	# we keep one for consistency with the proven manual build.
+	if [[ ! -s /boot/initramfs-${KV_FULL}.img ]]; then
+		einfo "No initramfs for ${KV_FULL}; generating one with dracut."
+		dracut --force /boot/initramfs-${KV_FULL}.img "${KV_FULL}" || \
+			ewarn "dracut initramfs generation failed; the kernel still boots (LVM/DM/XFS are built-in)"
+	fi
 
 	# Pin the lab service to this exact release (their reviewed-build
 	# gate: the unit starts only on a release that passed review). The
