@@ -143,6 +143,19 @@ src_prepare() {
 src_install() {
 	kernel-build_src_install
 
+	# Stage a DETERMINISTIC "installed release" marker, read from the CLEAN
+	# build image: ${D}/lib/modules holds ONLY this build's module dir
+	# (unlike the system /lib/modules, which may also hold a manual build
+	# and any placeholder from a failed/earlier run). pkg_postinst reads
+	# this marker instead of globbing the system, so a stray/placeholder
+	# dir can never make the dropin pin to the wrong release.
+	local rel_img
+	rel_img=$(ls -1 "${D}/lib/modules/" 2>/dev/null | grep -F "strix-gpu-bosgame-" | tail -1)
+	[[ -n ${rel_img} ]] || die "no strix module dir in the build image's /lib/modules"
+	insinto /usr/local/share/strix-kernel
+	echo "${rel_img}" > "${T}/strix-installed-release" || die
+	newins "${T}/strix-installed-release" installed-release
+
 	# Driver's lab tooling (their INSTALL recipe, ebuild-ified).
 	local lab=${DRIVER_S}/tools/lab
 
@@ -168,10 +181,15 @@ src_install() {
 
 pkg_postinst() {
 	# Pin the lab service to this exact release (their reviewed-build
-	# gate: the unit starts only on a release that passed review).
+	# gate: the unit starts only on a release that passed review). The
+	# release is read from the deterministic marker staged by src_install
+	# (from the clean build image), NOT by globbing the system
+	# /lib/modules — the system may hold a manual build and/or a
+	# placeholder dir from an earlier failed run, which a mtime-glob
+	# could pick and make the dropin pin to the wrong (rejected) release.
 	local rel conf
-	rel=$(ls -1dtr /lib/modules/*-strix-gpu-bosgame-* 2>/dev/null | tail -1 | sed 's:.*/::')
-	[[ -n ${rel} ]] || die "no strix kernel release found in /lib/modules"
+	rel=$(cat "${EROOT}/usr/local/share/strix-kernel/installed-release" 2>/dev/null)
+	[[ -n ${rel} ]] || die "no installed-release marker in ${EROOT}/usr/local/share/strix-kernel (did src_install run?)"
 	conf="${EROOT}/etc/systemd/system/usb4stream-lab.service.d/10-reviewed-kernel.conf"
 	python3 "${EROOT}/usr/local/sbin/strix-lab/reviewed-kernel-dropin" \
 		"${rel}" --output "${conf}" || die "reviewed-kernel dropin failed"
