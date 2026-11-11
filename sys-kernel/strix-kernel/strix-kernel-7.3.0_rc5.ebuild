@@ -44,8 +44,6 @@
 
 EAPI=8
 
-KERNEL_IUSE_GENERIC_UKI=1
-
 inherit kernel-build toolchain-funcs
 
 # Pinned upstream commit: "Linux 7.3-rc5" — the exact tree the driver's
@@ -72,11 +70,18 @@ LICENSE="GPL-2"
 SLOT="0"
 KEYWORDS="~amd64"
 
-# generic-uki: the kernel-build eclass only builds the dracut initramfs
-# when this flag is on (off by default). A lab kernel that ships
-# without an initramfs never reaches GRUB on these boxes, so it is
-# on by default here (+ prefix: bare flags default off).
-IUSE="+generic-uki debug"
+# debug: install the unstripped vmlinux debug image (off — no debug
+# vmlinux on the pool boxes). The kernel-build eclass also declares
+# strip/modules-sign (on by default) and secureboot (via its eclass);
+# those are merged automatically.
+#
+# NOTE: deliberately NOT generic-uki. That is a gentoo-kernel-bin flag
+# ("ship a generic PREBUILT UKI instead of generating a custom
+# initramfs"); on a source-compiled kernel it makes the eclass build a
+# 0-byte placeholder image and skip the custom initramfs. This kernel
+# generates its own initramfs via installkernel (dracut hook) at postinst,
+# driven by kernel-install_pkg_postinst called from pkg_postinst below.
+IUSE="debug"
 
 # The driver's apply-series.sh applies the pinned series with `git apply`;
 # the rest of the build (kernel-build eclass) is toolchain-only.
@@ -180,6 +185,15 @@ src_install() {
 }
 
 pkg_postinst() {
+	# Stage the kernel image into /boot + generate the initramfs + update
+	# GRUB, via the kernel-install eclass's OWN postinst. My ebuild defines
+	# its own pkg_postinst, which would otherwise SHADOW the eclass's
+	# kernel-install_pkg_postinst (the step that runs installkernel to place
+	# /boot/kernel-<rel> + the initramfs + run grub-mkconfig). Without this
+	# call the modules land in /lib/modules but no bootable image reaches
+	# /boot and the kernel never appears in GRUB.
+	kernel-install_pkg_postinst
+
 	# Pin the lab service to this exact release (their reviewed-build
 	# gate: the unit starts only on a release that passed review). The
 	# release is read from the deterministic marker staged by src_install
