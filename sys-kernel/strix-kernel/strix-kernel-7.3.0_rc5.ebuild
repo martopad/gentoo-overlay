@@ -124,7 +124,7 @@ src_prepare() {
 	# Known-good m5 pool config (snapshot of the live build's config with
 	# the build-time LOCALVERSION pin stripped) + the driver's fragment +
 	# the fresh LOCALVERSION. merge order: latest file wins per symbol.
-	cp "${FILESDIR}/config-${PV}-x86_64 .config" || die
+	cp "${FILESDIR}/config-${PV}-x86_64" ./.config || die
 	echo "CONFIG_LOCALVERSION=\"-${rel}\"" > "${T}/version.config" || die
 	kernel-build_merge_configs \
 		"${T}/version.config" \
