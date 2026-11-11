@@ -10,13 +10,16 @@
 # 2-node GLM/DeepSeek engines (strix-glm5) use.
 #
 # What this ebuild does:
-#  - applies the driver's pinned patch series to the pristine tree
-#    with portage's native patcher: the patch list is read from the
-#    driver's own patches/series file (the file the lab's provenance
-#    manifest pins via series_sha256) + the backports glob, in that
-#    order. The driver's tools/apply-series.sh is a distro-agnostic
-#    `git apply` convenience wrapper; on Gentoo we keep its ordering
-#    source of truth but use eapply (EAPI-8 built-in) for the apply.
+#  - applies the driver's pinned patch series to the pristine tree with
+#    the driver's own tools/apply-series.sh: the exact `git apply --check`
+#    + `git apply --whitespace=error-all` flow the lab qualified the
+#    series against. We do NOT use portage's eapply/patch(1): it
+#    mis-applies some hunks (observed on 0007) and corrupts later
+#    context, so the driver's git-apply tool is the source of truth.
+#    Ordering = their patches/series (the file the lab's provenance
+#    manifest pins via series_sha256) + the backports glob, both
+#    handled inside the script (which also does the fail-fast checks:
+#    no unsafe/missing/symlinked entries).
 #  - seeds config from the known-good m5 pool snapshot (files/) + the
 #    driver's usb4-gpu fragment + a fresh per-build LOCALVERSION under
 #    the lab prefix (their reviewed-build identity rules: unique, no
@@ -75,6 +78,12 @@ KEYWORDS="~amd64"
 # on by default here (+ prefix: bare flags default off).
 IUSE="+generic-uki"
 
+# The driver's apply-series.sh applies the pinned series with `git apply`;
+# the rest of the build (kernel-build eclass) is toolchain-only.
+BDEPEND="
+	dev-vcs/git
+"
+
 src_prepare() {
 	# Apply the pinned patch series with portage's native patcher.
 	#
@@ -90,23 +99,14 @@ src_prepare() {
 	# next emerge unpacks a fresh copy (their tool says the same thing).
 	eapply_user
 
-	local p b patches=()
-	while IFS= read -r p || [[ -n ${p} ]]; do
-		[[ ${p} == '' || ${p} == \#* ]] && continue
-		[[ ${p} == */* || ${p} == .* ]] &&
-			die "apply-series: unsafe series entry: ${p}"
-		[[ -f ${DRIVER_S}/patches/${p} && ! -L ${DRIVER_S}/patches/${p} ]] ||
-			die "apply-series: ${p} missing or symlinked in ${DRIVER_S}/patches"
-		patches+=( "${DRIVER_S}/patches/${p}" )
-	done < "${DRIVER_S}/patches/series"
-
-	for b in ${DRIVER_S}/patches/kernel-backports/*.patch; do
-		[[ -f ${b} ]] || continue
-		patches+=( "${b}" )
-	done
-
-	ewv "applying ${#patches[@]} driver patches (pinned series + backports)"
-	eapply "${patches[@]}"
+	# The driver's own tool: applies their pinned series (patches/series in
+	# listed order) + the kernel-backports glob, each via `git apply --check`
+	# then `git apply --whitespace=error-all`, fail-fast naming the first bad
+	# patch. Works on a plain (non-git) unpacked tree — the script sets
+	# GIT_CEILING_DIRECTORIES to the tree's parent and unsets GIT_DIR so
+	# `git apply` targets the kernel tree, not any surrounding checkout.
+	ewv "applying the driver's pinned patch series (git apply, their qualified flow)"
+	sh "${DRIVER_S}/tools/apply-series.sh" --with-backports "${S}"
 
 	# Per-build unique identity under the lab prefix. Bump the suffix
 	# letter while the module directory for that release already exists
