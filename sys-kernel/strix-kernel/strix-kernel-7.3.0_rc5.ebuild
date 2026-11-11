@@ -125,12 +125,19 @@ src_prepare() {
 
 	# Known-good m5 pool config (snapshot of the live build's config with
 	# the build-time LOCALVERSION pin stripped) + the driver's fragment +
-	# the fresh LOCALVERSION. merge order: latest file wins per symbol.
+	# the fresh LOCALVERSION.
+	#
+	# kernel-build_merge_configs merges its arguments IN ORDER onto .config
+	# (later arguments win per symbol). The driver's fragment ships a
+	# PLACEHOLDER CONFIG_LOCALVERSION ("-...-SET-A-UNIQUE-BUILD-ID"; its own
+	# comment shows the substitution), so version.config (the real per-build
+	# ID) MUST be merged last, or the placeholder wins and the driver's
+	# reviewed-kernel-dropin gate rejects the build at postinst.
 	cp "${FILESDIR}/config-${PV}-x86_64" ./.config || die
 	echo "CONFIG_LOCALVERSION=\"-${rel}\"" > "${T}/version.config" || die
 	kernel-build_merge_configs \
-		"${T}/version.config" \
-		"${DRIVER_S}/config/usb4-gpu.fragment"
+		"${DRIVER_S}/config/usb4-gpu.fragment" \
+		"${T}/version.config"
 }
 
 src_install() {
