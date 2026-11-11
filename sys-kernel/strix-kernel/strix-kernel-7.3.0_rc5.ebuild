@@ -76,7 +76,7 @@ KEYWORDS="~amd64"
 # when this flag is on (off by default). A lab kernel that ships
 # without an initramfs never reaches GRUB on these boxes, so it is
 # on by default here (+ prefix: bare flags default off).
-IUSE="+generic-uki"
+IUSE="+generic-uki debug"
 
 # The driver's apply-series.sh applies the pinned series with `git apply`;
 # the rest of the build (kernel-build eclass) is toolchain-only.
@@ -105,7 +105,9 @@ src_prepare() {
 	# patch. Works on a plain (non-git) unpacked tree — the script sets
 	# GIT_CEILING_DIRECTORIES to the tree's parent and unsets GIT_DIR so
 	# `git apply` targets the kernel tree, not any surrounding checkout.
-	ewv "applying the driver's pinned patch series (git apply, their qualified flow)"
+	# (No ewv/einfo here: this distro ships without eutils.eclass, so the
+	#  eutils messaging functions are undefined; the driver script prints
+	#  its own "applied N patch(es)" line to the build log.)
 	sh "${DRIVER_S}/tools/apply-series.sh" --with-backports "${S}"
 
 	# Per-build unique identity under the lab prefix. Bump the suffix
